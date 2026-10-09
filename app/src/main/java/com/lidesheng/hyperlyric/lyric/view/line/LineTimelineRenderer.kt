@@ -63,6 +63,11 @@ internal class LineTimelineRenderer : LineRenderer {
                 centerIfPossible -> (width - model.width) / 2f
                 else -> 0f
             }
+        } else if (model.isRtl) {
+            // ScrollStepper produces a negative offset as progress advances.
+            // Mirror that offset for RTL so the logical first word at the right
+            // edge moves right instead of the entire line drifting left.
+            (width - model.width) - state.scrollOffset
         } else {
             state.scrollOffset
         }

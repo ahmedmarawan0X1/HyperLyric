@@ -73,7 +73,7 @@ internal class LineTimelineRenderer : LineRenderer {
 
         if (offset < width && offset + model.width > 0f) {
             canvas.withTranslation(x = offset) {
-                drawText(model.text, 0f, baseline, paint)
+                drawLyricText(model.text, 0f, baseline, paint, model.isRtl)
             }
         }
     }

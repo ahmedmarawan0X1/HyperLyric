@@ -37,6 +37,14 @@ internal class TextDrawer {
         liftFactor = DEFAULT_LATIN_LIFT_FACTOR,
         waveFactor = DEFAULT_LATIN_WAVE_FACTOR
     )
+    // Arabic shaping requires drawing a complete word as one RTL run. The Latin
+    // per-character preference must never split Arabic glyphs into isolated forms.
+    private val arabicMotionSpec = MotionSpec(
+        animateByChar = false,
+        distributeCharsEvenly = false,
+        liftFactor = DEFAULT_LATIN_LIFT_FACTOR,
+        waveFactor = DEFAULT_LATIN_WAVE_FACTOR
+    )
 
     var cjkLiftFactor: Float
         get() = cjkMotionSpec.liftFactor
@@ -147,7 +155,7 @@ internal class TextDrawer {
             if (visibleEnd <= visibleStart) return@withSave
 
             if (scrollOnly) {
-                canvas.drawText(model.wordText, 0f, y, normPaint)
+                canvas.drawLyricText(model.wordText, 0f, y, normPaint, model.isRtl)
                 return@withSave
             }
 
@@ -163,29 +171,40 @@ internal class TextDrawer {
             }
 
             if (charMotionEnabled) {
-                val bgClipStart = if (useGradient) 0f else highlightWidth
+                val bgClipStart = if (useGradient || model.isRtl) 0f else highlightWidth
+                val bgClipEnd = if (!useGradient && model.isRtl) {
+                    min(visibleEnd, model.width - highlightWidth)
+                } else {
+                    visibleEnd
+                }
                 drawAnimatedUnits(
                     canvas,
                     model,
                     highlightWidth,
                     max(bgClipStart, visibleStart),
-                    visibleEnd,
+                    bgClipEnd,
                     motionClipBottom,
                     y,
                     bgPaint
                 )
             } else if (!useGradient) {
                 canvas.withSave {
-                    canvas.clipRect(highlightWidth, 0f, Float.MAX_VALUE, viewHeight.toFloat())
-                    canvas.drawText(model.wordText, 0f, y, bgPaint)
+                    if (model.isRtl) {
+                        canvas.clipRect(0f, 0f, model.width - highlightWidth, viewHeight.toFloat())
+                    } else {
+                        canvas.clipRect(highlightWidth, 0f, Float.MAX_VALUE, viewHeight.toFloat())
+                    }
+                    canvas.drawLyricText(model.wordText, 0f, y, bgPaint, model.isRtl)
                 }
             } else {
-                canvas.drawText(model.wordText, 0f, y, bgPaint)
+                canvas.drawLyricText(model.wordText, 0f, y, bgPaint, model.isRtl)
             }
 
             if (highlightWidth > 0f) {
                 val atEnd = highlightWidth >= model.width
-                val featherWidth = if (useGradient && !atEnd) {
+                // The existing feather shader travels left-to-right. Disable only that
+                // cosmetic feather for RTL so the actual highlight boundary remains correct.
+                val featherWidth = if (useGradient && !atEnd && !model.isRtl) {
                     hlPaint.textSize * HIGHLIGHT_FEATHER_WIDTH_FACTOR
                 } else {
                     0f
@@ -196,13 +215,22 @@ internal class TextDrawer {
                 } else {
                     min(model.width, highlightWidth)
                 }
+                val highlightClipStart = if (model.isRtl) {
+                    max(0f, model.width - highlightClipEnd)
+                } else {
+                    0f
+                }
                 canvas.withSave {
                     val clipBottom = if (charMotionEnabled) {
                         motionClipBottom
                     } else {
                         viewHeight.toFloat()
                     }
-                    canvas.clipRect(0f, 0f, highlightClipEnd, clipBottom)
+                    if (model.isRtl) {
+                        canvas.clipRect(highlightClipStart, 0f, model.width, clipBottom)
+                    } else {
+                        canvas.clipRect(0f, 0f, highlightClipEnd, clipBottom)
+                    }
 
                     if (hasFeather) {
                         val baseShader = if (isRainbowHl) {
@@ -239,14 +267,14 @@ internal class TextDrawer {
                             canvas,
                             model,
                             highlightWidth,
-                            visibleStart,
-                            min(highlightClipEnd, visibleEnd),
+                            if (model.isRtl) max(visibleStart, highlightClipStart) else visibleStart,
+                            if (model.isRtl) visibleEnd else min(highlightClipEnd, visibleEnd),
                             motionClipBottom,
                             y,
                             hlPaint
                         )
                     } else {
-                        canvas.drawText(model.wordText, 0f, y, hlPaint)
+                        canvas.drawLyricText(model.wordText, 0f, y, hlPaint, model.isRtl)
                     }
                 }
             }
@@ -274,8 +302,8 @@ internal class TextDrawer {
                     drawX = word.startPosition,
                     inkStart = word.startPosition + word.inkStartOffset,
                     inkEnd = word.startPosition + word.inkEndOffset,
-                    motionStart = word.startPosition,
-                    motionEnd = word.endPosition,
+                    motionStart = if (model.isRtl) model.width - word.endPosition else word.startPosition,
+                    motionEnd = if (model.isRtl) model.width - word.startPosition else word.endPosition,
                     highlightWidth = highlightWidth,
                     clipStart = clipStart,
                     clipEnd = clipEnd,
@@ -295,15 +323,25 @@ internal class TextDrawer {
             for (i in word.chars.indices) {
                 val charStart = word.charStartPositions[i]
                 val charEnd = word.charEndPositions[i]
-                val motionStart = if (motionSpec.distributeCharsEvenly) {
+                val physicalMotionStart = if (motionSpec.distributeCharsEvenly) {
                     word.startPosition + evenMotionWidth * i
                 } else {
                     charStart
                 }
-                val motionEnd = if (motionSpec.distributeCharsEvenly) {
-                    motionStart + evenMotionWidth
+                val physicalMotionEnd = if (motionSpec.distributeCharsEvenly) {
+                    physicalMotionStart + evenMotionWidth
                 } else {
                     charEnd
+                }
+                val motionStart = if (model.isRtl) {
+                    model.width - physicalMotionEnd
+                } else {
+                    physicalMotionStart
+                }
+                val motionEnd = if (model.isRtl) {
+                    model.width - physicalMotionStart
+                } else {
+                    physicalMotionEnd
                 }
                 drawAnimatedTextUnit(
                     canvas = canvas,
@@ -359,7 +397,14 @@ internal class TextDrawer {
 
         canvas.withSave {
             clipRect(visibleLeft, 0f, visibleRight, clipBottom)
-            drawText(text, start, end, drawX, baselineY + liftY, paint)
+            if (text.isRtlLyricText() && start == 0 && end == text.length) {
+                drawTextRun(
+                    text, start, end, 0, text.length,
+                    drawX, baselineY + liftY, true, paint
+                )
+            } else {
+                drawText(text, start, end, drawX, baselineY + liftY, paint)
+            }
         }
     }
 
@@ -384,8 +429,11 @@ internal class TextDrawer {
         return maxOffset * (1f - phase)
     }
 
-    private fun WordModel.motionSpec(): MotionSpec =
-        if (containsCjk) cjkMotionSpec else latinMotionSpec
+    private fun WordModel.motionSpec(): MotionSpec = when {
+        containsCjk -> cjkMotionSpec
+        containsArabic -> arabicMotionSpec
+        else -> latinMotionSpec
+    }
 
     private class MotionSpec(
         var animateByChar: Boolean,

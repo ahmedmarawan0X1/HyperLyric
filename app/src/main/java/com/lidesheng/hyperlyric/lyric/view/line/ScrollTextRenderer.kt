@@ -171,7 +171,7 @@ internal class ScrollTextRenderer : LineRenderer {
 
         if (offset < vw && offset + model.width > 0) {
             canvas.withTranslation(x = offset) {
-                drawText(model.text, 0f, cachedBaseline, paint)
+                drawLyricText(model.text, 0f, cachedBaseline, paint, model.isRtl)
             }
         }
 
@@ -181,7 +181,7 @@ internal class ScrollTextRenderer : LineRenderer {
                 val ghostX = rightEdge + ghostSpacing
                 if (ghostX < vw) {
                     canvas.withTranslation(x = ghostX) {
-                        drawText(model.text, 0f, cachedBaseline, paint)
+                        drawLyricText(model.text, 0f, cachedBaseline, paint, model.isRtl)
                     }
                 }
             }

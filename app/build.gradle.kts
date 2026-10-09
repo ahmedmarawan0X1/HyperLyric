@@ -23,6 +23,9 @@ android {
 
     buildTypes {
         release {
+            // A custom upload key is not required for local installation/testing.
+            // This is intentionally not a Play Store signing identity.
+            signingConfig = signingConfigs.getByName("debug")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

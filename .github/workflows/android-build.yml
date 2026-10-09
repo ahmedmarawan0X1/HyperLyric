@@ -1,4 +1,4 @@
-name: Android Build
+name: Android Test Build
 
 on:
   push:
@@ -10,10 +10,10 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
-  group: android-build-${{ github.ref }}
+  group: android-test-build-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -24,23 +24,61 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "21"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: wrapper
+          cache-read-only: false
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
 
       - name: Build debug APK
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./gradlew --no-daemon assembleDebug
 
-      - name: Upload debug APK
-        if: success()
+      - name: Upload debug APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: HyperLyric-debug
+          name: HyperLyric-debug-${{ github.sha }}
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 14
+
+      - name: Prepare test release notes
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          {
+            echo "## HyperLyric test build"
+            echo
+            echo "- Branch: ${GITHUB_REF_NAME}"
+            echo "- Commit: ${GITHUB_SHA}"
+            echo "- Purpose: test Arabic RTL lyric rendering and connected Arabic shaping."
+            echo
+            echo "This is an unsigned-by-release-pipeline debug APK for testing. It is not a stable release."
+          } > test-release-notes.md
+
+      - name: Publish test pre-release
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: test-rtl-${{ github.sha }}
+          name: HyperLyric Test Build ${{ github.sha }}
+          body_path: test-release-notes.md
+          draft: false
+          prerelease: true
+          files: app/build/outputs/apk/debug/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

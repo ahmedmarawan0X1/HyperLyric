@@ -432,7 +432,7 @@ internal class TextDrawer {
 
     private fun WordModel.motionSpec(): MotionSpec = when {
         containsCjk -> cjkMotionSpec
-        containsArabic -> arabicMotionSpec
+        isRtlText -> arabicMotionSpec
         else -> latinMotionSpec
     }
 

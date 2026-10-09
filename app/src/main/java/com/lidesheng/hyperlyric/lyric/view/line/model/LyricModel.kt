@@ -12,6 +12,7 @@ import com.lidesheng.hyperlyric.lyric.model.LyricLine
 import com.lidesheng.hyperlyric.lyric.model.LyricMetadata
 import com.lidesheng.hyperlyric.lyric.model.LyricWord
 import com.lidesheng.hyperlyric.lyric.model.extensions.TimingNavigator
+import com.lidesheng.hyperlyric.lyric.view.line.isRtlLyricText
 import kotlin.math.min
 
 data class LyricModel(
@@ -29,13 +30,25 @@ data class LyricModel(
     val wordText: String by lazy { words.toText() }
     val wordTimingNavigator: TimingNavigator<WordModel> by lazy { TimingNavigator(words.toTypedArray()) }
     val isPlainText: Boolean = words.isEmpty()
+    val isRtl: Boolean get() = (text.ifBlank { wordText }).isRtlLyricText()
 
     fun updateSizes(paint: Paint) {
-        width = getTextFullWidth(paint, text)
-        var previous: WordModel? = null
-        words.forEach { word ->
-            word.updateSizes(previous, paint)
-            previous = word
+        width = getTextFullWidth(paint, text.ifBlank { wordText })
+        if (isRtl) {
+            // Word timestamps stay in logical lyric order, while their visual positions
+            // are laid out from right to left for Arabic and other RTL scripts.
+            words.forEach { it.updateSizes(null, paint) }
+            var right = width
+            words.forEach { word ->
+                right -= word.textWidth
+                word.setStartPosition(right)
+            }
+        } else {
+            var previous: WordModel? = null
+            words.forEach { word ->
+                word.updateSizes(previous, paint)
+                previous = word
+            }
         }
         updateSustainStrengths(paint.textSize)
     }
@@ -136,7 +149,9 @@ internal fun LyricLine.createModel(): LyricModel = LyricModel(
     duration = duration,
     text = text.orEmpty(),
     words = words?.toWordModels() ?: emptyList(),
-    isAlignedRight = isAlignedRight,
+    isAlignedRight = isAlignedRight ||
+            (text.orEmpty().ifBlank { words?.joinToString("") { it.text.orEmpty() }.orEmpty() }
+                .isRtlLyricText()),
     metadata = metadata
 )
 

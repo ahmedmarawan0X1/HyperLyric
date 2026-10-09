@@ -12,6 +12,7 @@ import android.graphics.Paint
 import android.graphics.Rect
 import com.lidesheng.hyperlyric.lyric.model.LyricMetadata
 import com.lidesheng.hyperlyric.lyric.model.interfaces.ILyricTiming
+import com.lidesheng.hyperlyric.lyric.view.line.isRtlLyricText
 
 /**
  * 表示歌词中的单词及其相关位置信息、时间信息和字符偏移。
@@ -69,6 +70,9 @@ data class WordModel(
     /** Whether this word uses the CJK per-character motion profile. */
     val containsCjk: Boolean = text.any { it.isCjkTextUnit() }
 
+    /** Arabic shaping is contextual; it must be drawn as a complete word, never by UTF-16 char. */
+    val isRtlText: Boolean = text.isRtlLyricText()
+
     /** 拆分后的字符数组 */
     val chars: CharArray = text.toCharArray()
 
@@ -106,7 +110,7 @@ data class WordModel(
             charInkEndOffsets[i] = charBounds.right + GLYPH_CLIP_PADDING
         }
 
-        textWidth = charWidths.sum()
+        textWidth = if (isRtlText) paint.measureText(text) else charWidths.sum()
         startPosition = previous?.endPosition ?: 0f
         endPosition = startPosition + textWidth
 
@@ -115,6 +119,17 @@ data class WordModel(
             charStartPositions[i] = currentPosition
             currentPosition += charWidths[i]
             charEndPositions[i] = currentPosition
+        }
+    }
+
+    /** Repositions a measured word without losing its per-character geometry. */
+    internal fun setStartPosition(position: Float) {
+        val delta = position - startPosition
+        startPosition = position
+        endPosition = position + textWidth
+        for (i in chars.indices) {
+            charStartPositions[i] += delta
+            charEndPositions[i] += delta
         }
     }
 

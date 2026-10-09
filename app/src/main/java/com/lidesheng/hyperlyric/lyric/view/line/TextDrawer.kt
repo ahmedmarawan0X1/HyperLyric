@@ -400,7 +400,7 @@ internal class TextDrawer {
             if (text.isRtlLyricText() && start == 0 && end == text.length) {
                 drawTextRun(
                     text, start, end, 0, text.length,
-                    drawX + paint.measureText(text, start, end),
+                    drawX,
                     baselineY + liftY, true, paint
                 )
             } else {

@@ -39,7 +39,12 @@ internal fun Canvas.drawLyricText(
     isRtl: Boolean
 ) {
     if (isRtl && text.isNotEmpty()) {
-        drawTextRun(text, 0, text.length, 0, text.length, x, y, true, paint)
+        // drawTextRun uses x as the RTL run's right edge; renderers supply the left edge.
+        // Shift by the shaped run width so placement, clipping and scrolling share one origin.
+        drawTextRun(
+            text, 0, text.length, 0, text.length,
+            x + paint.measureText(text), y, true, paint
+        )
     } else {
         drawText(text, x, y, paint)
     }

@@ -487,6 +487,10 @@ open class LyricLineView(context: Context, attrs: AttributeSet? = null) :
     }
 
     override fun onDraw(canvas: Canvas) {
+        // Text shaping follows the lyric script; marquee travel follows the UI layout direction.
+        val moveRtlLyricsTowardRight = layoutDirection == View.LAYOUT_DIRECTION_RTL
+        scrollRenderer.moveRtlLyricsTowardRight = moveRtlLyricsTowardRight
+        lineTimelineRenderer.moveRtlLyricsTowardRight = moveRtlLyricsTowardRight
         activeRenderer.draw(canvas, _model, textPaint, lineState, measuredWidth, measuredHeight)
     }
 

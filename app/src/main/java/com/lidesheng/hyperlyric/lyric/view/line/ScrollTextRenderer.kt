@@ -33,6 +33,8 @@ internal class ScrollTextRenderer : LineRenderer {
     var repeatCount: Int = -1
     var stopAtEnd: Boolean = false
     var peerLineWidth: Float = 0f
+    /** Controls marquee travel independently from the text's shaping direction. */
+    var moveRtlLyricsTowardRight: Boolean = false
 
     override val isPlaying get() = isRunning || isPendingDelay
     override val isFinished get() = finished
@@ -161,7 +163,7 @@ internal class ScrollTextRenderer : LineRenderer {
                 centerIfPossible -> (vw - model.width) / 2f
                 else -> 0f
             }
-        } else if (model.isRtl) {
+        } else if (model.isRtl && moveRtlLyricsTowardRight) {
             (vw - model.width) - state.scrollOffset
         } else {
             state.scrollOffset
@@ -180,8 +182,8 @@ internal class ScrollTextRenderer : LineRenderer {
         }
 
         if (model.width > vw) {
-            if (model.isRtl) {
-                // In RTL mode the next copy enters from the left as the first word
+            if (model.isRtl && moveRtlLyricsTowardRight) {
+                // When the UI is RTL, the next copy enters from the left as the first word
                 // exits to the right.
                 val ghostX = offset - model.width - ghostSpacing
                 if (ghostX + model.width > 0f && ghostX < vw) {

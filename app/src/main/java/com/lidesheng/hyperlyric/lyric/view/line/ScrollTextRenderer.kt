@@ -153,12 +153,16 @@ internal class ScrollTextRenderer : LineRenderer {
         viewHeight: Int
     ) {
         val vw = viewWidth.toFloat()
+        // RTL lyrics begin with their logical first word at the right edge. Reverse
+        // the viewport translation so that this first word travels toward the right.
         val offset = if (model.width <= vw) {
             when {
                 model.isAlignedRight || rightIfPossible -> vw - model.width
                 centerIfPossible -> (vw - model.width) / 2f
                 else -> 0f
             }
+        } else if (model.isRtl) {
+            (vw - model.width) - state.scrollOffset
         } else {
             state.scrollOffset
         }
@@ -176,12 +180,23 @@ internal class ScrollTextRenderer : LineRenderer {
         }
 
         if (model.width > vw) {
-            val rightEdge = offset + model.width
-            if (rightEdge < vw) {
-                val ghostX = rightEdge + ghostSpacing
-                if (ghostX < vw) {
+            if (model.isRtl) {
+                // In RTL mode the next copy enters from the left as the first word
+                // exits to the right.
+                val ghostX = offset - model.width - ghostSpacing
+                if (ghostX + model.width > 0f && ghostX < vw) {
                     canvas.withTranslation(x = ghostX) {
-                        drawLyricText(model.text, 0f, cachedBaseline, paint, model.isRtl)
+                        drawLyricText(model.text, 0f, cachedBaseline, paint, true)
+                    }
+                }
+            } else {
+                val rightEdge = offset + model.width
+                if (rightEdge < vw) {
+                    val ghostX = rightEdge + ghostSpacing
+                    if (ghostX < vw) {
+                        canvas.withTranslation(x = ghostX) {
+                            drawLyricText(model.text, 0f, cachedBaseline, paint, false)
+                        }
                     }
                 }
             }

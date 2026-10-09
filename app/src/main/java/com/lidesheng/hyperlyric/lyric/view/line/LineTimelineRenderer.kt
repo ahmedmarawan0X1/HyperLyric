@@ -25,6 +25,9 @@ internal class LineTimelineRenderer : LineRenderer {
     override var centerIfPossible = false
     override var rightIfPossible = false
 
+    /** Controls marquee travel independently from RTL text shaping. */
+    var moveRtlLyricsTowardRight: Boolean = false
+
     private var lastPosition = Long.MIN_VALUE
 
     override val isPlaying: Boolean
@@ -63,7 +66,7 @@ internal class LineTimelineRenderer : LineRenderer {
                 centerIfPossible -> (width - model.width) / 2f
                 else -> 0f
             }
-        } else if (model.isRtl) {
+        } else if (model.isRtl && moveRtlLyricsTowardRight) {
             // ScrollStepper produces a negative offset as progress advances.
             // Mirror that offset for RTL so the logical first word at the right
             // edge moves right instead of the entire line drifting left.

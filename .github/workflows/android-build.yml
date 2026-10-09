@@ -1,4 +1,4 @@
-name: Android Test Build
+name: Android Stable Release
 
 on:
   push:
@@ -13,12 +13,12 @@ permissions:
   contents: write
 
 concurrency:
-  group: android-test-build-${{ github.ref }}
+  group: android-stable-release-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build:
-    name: Build Debug APK
+    name: Build Installable Release APK
     runs-on: ubuntu-latest
     steps:
       - name: Checkout source
@@ -42,13 +42,13 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
-      - name: Build debug APK
+      - name: Build release APK
         env:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./gradlew --no-daemon assembleRelease
 
-      - name: Upload debug APK artifact
+      - name: Upload release APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: HyperLyric-release-${{ github.sha }}
@@ -56,12 +56,12 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Prepare test release notes
+      - name: Prepare stable release notes
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         shell: bash
         run: |
           {
-            echo "## HyperLyric test build"
+            echo "## HyperLyric stable release build"
             echo
             echo "- Branch: ${GITHUB_REF_NAME}"
             echo "- Commit: ${GITHUB_SHA}"
@@ -70,7 +70,7 @@ jobs:
             echo "The APK is built from the release variant and signed with Android's default debug key because no custom signing key was provided. It is installable for testing, but is not signed with a private production/upload key."
           } > test-release-notes.md
 
-      - name: Publish test pre-release
+      - name: Publish stable release
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
         with:
